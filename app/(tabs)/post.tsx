@@ -5,6 +5,7 @@ import { draftRepository } from '@/src/lib/domain/draftRepository';
 import { takeRepository } from '@/src/lib/domain/takeRepository';
 import { LocalUser } from '@/src/lib/domain/types';
 import { userRepository } from '@/src/lib/domain/userRepository';
+import { storage } from '@/src/lib/storage/storage';
 import { useTheme } from '@/src/theme/ThemeProvider';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -156,50 +157,71 @@ export default function PostScreen() {
           // Clear editing flag
           await storage.remove('@12thman:editing_take_id');
         }
+
+        // Clear draft and reset form
+        await draftRepository.clearDraft();
+        await storage.remove('@12thman:editing_take_id');
+        setSelectedMatchId(null);
+        setMatchRating(null);
+        setMotmPlayerId(null);
+        setTakeText('');
+
+        // Navigate to feed to see the queued take
+        Alert.alert(
+          'Take Updated',
+          'Take updated successfully',
+          [
+            {
+              text: 'View Feed',
+              onPress: () => router.push('/(tabs)'),
+            },
+            {
+              text: 'OK',
+              style: 'cancel',
+            },
+          ]
+        );
       } else {
         // Create new take with queued status
         await takeRepository.create({
-        userId: user.userId,
-        userName: user.userName,
-        userClub: user.userClub,
-        fixtureId: selectedMatch.id,
-        matchRating: matchRating!,
-        motmPlayerId: motmPlayerId || undefined,
-        text: takeText.trim(),
-        reactions: {
-          cheer: 0,
-          boo: 0,
-          comment: 0,
-        },
-      });
+          userId: user.userId,
+          userName: user.userName,
+          userClub: user.userClub,
+          fixtureId: selectedMatch.id,
+          matchRating: matchRating!,
+          motmPlayerId: motmPlayerId || undefined,
+          text: takeText.trim(),
+          reactions: {
+            cheer: 0,
+            boo: 0,
+            comment: 0,
+          },
+        });
+
+        // Clear draft and reset form
+        await draftRepository.clearDraft();
+        await storage.remove('@12thman:editing_take_id');
+        setSelectedMatchId(null);
+        setMatchRating(null);
+        setMotmPlayerId(null);
+        setTakeText('');
+
+        // Navigate to feed to see the queued take
+        Alert.alert(
+          'Take Queued',
+          'Your take has been saved and will sync when online.',
+          [
+            {
+              text: 'View Feed',
+              onPress: () => router.push('/(tabs)'),
+            },
+            {
+              text: 'OK',
+              style: 'cancel',
+            },
+          ]
+        );
       }
-
-      // Clear draft and reset form
-      await draftRepository.clearDraft();
-      await storage.remove('@12thman:editing_take_id');
-      setSelectedMatchId(null);
-      setMatchRating(null);
-      setMotmPlayerId(null);
-      setTakeText('');
-
-      // Navigate to feed to see the queued take
-      const message = editingTakeId
-        ? 'Take updated successfully'
-        : 'Your take has been saved and will sync when online.';
-      Alert.alert(
-        editingTakeId ? 'Take Updated' : 'Take Queued',
-        message,
-        [
-          {
-            text: 'View Feed',
-            onPress: () => router.push('/(tabs)'),
-          },
-          {
-            text: 'OK',
-            style: 'cancel',
-          },
-        ]
-      );
     } catch (error) {
       Alert.alert('Error', 'Failed to save take. Please try again.');
       console.error('Error saving take:', error);
