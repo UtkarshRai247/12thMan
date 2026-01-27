@@ -1,0 +1,12 @@
+node_modules
+.expo
+.expo-shared
+dist
+build
+*.log
+*.lock
+package-lock.json
+.git
+.vscode
+*.md
+!README.md
