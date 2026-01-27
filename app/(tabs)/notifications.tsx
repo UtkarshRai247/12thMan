@@ -3,20 +3,20 @@ import { View, StyleSheet } from 'react-native';
 import { useTheme } from '@/src/theme/ThemeProvider';
 import { Text } from '@/src/components/Text';
 
-export default function ExploreScreen() {
+export default function NotificationsScreen() {
   const theme = useTheme();
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.content}>
         <Text variant="h2" style={styles.title}>
-          Explore
+          Notifications
         </Text>
         <Text variant="body" style={{ color: theme.colors.textSecondary, textAlign: 'center' }}>
-          Discover matches, clubs, and fan takes
+          Stay updated with match alerts and fan activity
         </Text>
         <Text variant="caption" style={{ color: theme.colors.textTertiary, marginTop: 16, textAlign: 'center' }}>
-          Coming soon...
+          No notifications yet
         </Text>
       </View>
     </View>
