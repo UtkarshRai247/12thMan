@@ -124,6 +124,7 @@ export default function PostScreen() {
     return Object.keys(newErrors).length === 0;
   };
 
+  
   const handleSubmit = async () => {
     if (!validate()) {
       return;
@@ -509,3 +510,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 });
+
+
+

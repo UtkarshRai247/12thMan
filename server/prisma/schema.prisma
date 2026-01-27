@@ -1,0 +1,46 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  club      String
+  createdAt DateTime @default(now())
+  takes     Take[]
+
+  @@map("users")
+}
+
+model Take {
+  id               String            @id @default(uuid()) // providerId
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId         String            // idempotency key from client
+  fixtureId        String
+  matchRating      Int
+  motmPlayerId     String?
+  text             String
+  moderationStatus ModerationStatus  @default(POSTED)
+  createdAt        DateTime          // accept client createdAt, else server now
+  syncedAt         DateTime          @default(now())
+
+  @@unique([userId, clientId])
+  @@index([fixtureId, createdAt, id])
+  @@index([userId, createdAt, id])
+  @@map("takes")
+}
+
+enum ModerationStatus {
+  POSTED
+  HIDDEN
+  REMOVED
+}
