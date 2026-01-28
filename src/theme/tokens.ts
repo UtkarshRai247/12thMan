@@ -117,9 +117,9 @@ export const colors = {
     primaryDark: '#CBD5E1',
     
     // Accent colors
-    accent: '#93C5FD', // Brighter floodlight blue
-    accentLight: '#BFDBFE',
-    accentDark: '#60A5FA',
+    accent: '#5B9BF5', // Darker floodlight blue for dark mode
+    accentLight: '#93C5FD',
+    accentDark: '#3B82F6',
     
     // Status colors
     success: '#4ADE80', // Brighter pitch green

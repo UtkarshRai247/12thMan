@@ -6,10 +6,10 @@ import { Text } from './Text';
 interface ReactionBarProps {
   cheerCount?: number;
   booCount?: number;
-  commentCount?: number;
+  shoutCount?: number;
   onCheer?: () => void;
   onBoo?: () => void;
-  onComment?: () => void;
+  onShout?: () => void;
   userReactions?: {
     cheered?: boolean;
     booed?: boolean;
@@ -19,16 +19,16 @@ interface ReactionBarProps {
 export function ReactionBar({
   cheerCount = 0,
   booCount = 0,
-  commentCount = 0,
+  shoutCount = 0,
   onCheer,
   onBoo,
-  onComment,
+  onShout,
   userReactions,
 }: ReactionBarProps) {
   const theme = useTheme();
   const cheerScale = useRef(new Animated.Value(1)).current;
   const booScale = useRef(new Animated.Value(1)).current;
-  const commentScale = useRef(new Animated.Value(1)).current;
+  const shoutScale = useRef(new Animated.Value(1)).current;
 
   const animatePress = (animValue: Animated.Value) => {
     Animated.sequence([
@@ -55,9 +55,9 @@ export function ReactionBar({
     onBoo?.();
   };
 
-  const handleComment = () => {
-    animatePress(commentScale);
-    onComment?.();
+  const handleShout = () => {
+    animatePress(shoutScale);
+    onShout?.();
   };
 
   return (
@@ -158,9 +158,9 @@ export function ReactionBar({
         </TouchableOpacity>
       </Animated.View>
 
-      <Animated.View style={{ transform: [{ scale: commentScale }] }}>
+      <Animated.View style={{ transform: [{ scale: shoutScale }] }}>
         <TouchableOpacity
-          onPress={handleComment}
+          onPress={handleShout}
           style={[
             styles.button,
             {
@@ -179,9 +179,9 @@ export function ReactionBar({
               },
             ]}
           >
-            COMMENT
+            SHOUT
           </Text>
-          {commentCount > 0 && (
+          {shoutCount > 0 && (
             <Text
               variant="caption"
               style={[
@@ -191,7 +191,7 @@ export function ReactionBar({
                 },
               ]}
             >
-              {commentCount}
+              {shoutCount}
             </Text>
           )}
         </TouchableOpacity>

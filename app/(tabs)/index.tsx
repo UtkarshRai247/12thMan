@@ -1,95 +1,101 @@
 import { MatchCard } from '@/src/components/MatchCard';
-import { TakeCard } from '@/src/components/TakeCard';
 import { Text } from '@/src/components/Text';
 import { mockFixtures } from '@/src/data/mock/fixtures';
-import { mockTakes } from '@/src/data/mock/takes';
-import { takeRepository } from '@/src/lib/domain/takeRepository';
-import { Take, TakeStatus } from '@/src/lib/domain/types';
+import { MatchStatus } from '@/src/lib/apiFootball/types';
 import { useTheme } from '@/src/theme/ThemeProvider';
-import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-
-type FeedType = 'forYou' | 'following';
-type TakeFilter = 'all' | 'posted' | 'queued' | 'failed';
+import { useRouter } from 'expo-router';
+import { Calendar } from 'lucide-react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function FeedScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const [feedType, setFeedType] = useState<FeedType>('forYou');
-  const [takeFilter, setTakeFilter] = useState<TakeFilter>('all');
-  const [localTakes, setLocalTakes] = useState<Take[]>([]);
+  const insets = useSafeAreaInsets();
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [refreshing, setRefreshing] = useState(false);
-
-  // Load local takes when screen is focused
-  const loadTakes = async () => {
-    const takes = await takeRepository.getAll();
-    setLocalTakes(takes);
-  };
-
-  useFocusEffect(
-    React.useCallback(() => {
-      loadTakes();
-    }, [])
-  );
-
-  // Sort, dedupe, and filter takes
-  const processedTakes = useMemo(() => {
-    // Combine local takes and mock takes
-    const allTakes = [
-      ...localTakes,
-      ...mockTakes.map((take) => ({
-        id: take.id,
-        clientId: take.id,
-        userId: take.userId,
-        userName: take.userName,
-        userClub: take.userClub,
-        fixtureId: take.fixtureId,
-        matchRating: take.matchRating,
-        motmPlayerId: take.motmPlayerId,
-        text: take.text,
-        reactions: take.reactions,
-        status: 'posted' as TakeStatus,
-        retryCount: 0,
-        createdAt: take.createdAt,
-      })),
-    ];
-
-    // Dedupe by clientId (keep newest by createdAt)
-    const deduped = new Map<string, Take>();
-    allTakes.forEach((take) => {
-      const existing = deduped.get(take.clientId);
-      if (!existing || new Date(take.createdAt) > new Date(existing.createdAt)) {
-        deduped.set(take.clientId, take);
-      }
-    });
-
-    // Filter by status
-    let filtered = Array.from(deduped.values());
-    if (takeFilter !== 'all') {
-      filtered = filtered.filter((take) => {
-        if (takeFilter === 'queued') {
-          return take.status === 'queued' || take.status === 'syncing';
-        }
-        return take.status === takeFilter;
-      });
-    }
-
-    // Sort by createdAt desc (or syncedAt for posted takes)
-    filtered.sort((a, b) => {
-      const aTime = a.status === 'posted' && a.syncedAt ? a.syncedAt : a.createdAt;
-      const bTime = b.status === 'posted' && b.syncedAt ? b.syncedAt : b.createdAt;
-      return new Date(bTime).getTime() - new Date(aTime).getTime();
-    });
-
-    return filtered;
-  }, [localTakes, takeFilter]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const dateScrollViewRef = useRef<ScrollView>(null);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadTakes();
-    setRefreshing(false);
+    // Refresh fixtures here if needed
+    setTimeout(() => setRefreshing(false), 500);
   };
+
+  // Format date for display
+  const formatDateDisplay = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selected = new Date(date);
+    selected.setHours(0, 0, 0, 0);
+    
+    const diffTime = selected.getTime() - today.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === -1) return 'Yesterday';
+    if (diffDays === 1) return 'Tomorrow';
+    
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  // Get date navigation options (Yesterday, Today, Tomorrow, etc.)
+  const getDateOptions = () => {
+    const today = new Date();
+    const dates = [];
+    for (let i = -2; i <= 3; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() + i);
+      dates.push(date);
+    }
+    return dates;
+  };
+
+  const dateOptions = getDateOptions();
+
+  // Auto-scroll to "Today" on mount
+  useEffect(() => {
+    // Find index of today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayIndex = dateOptions.findIndex((date) => {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime() === today.getTime();
+    });
+
+    if (todayIndex >= 0 && dateScrollViewRef.current) {
+      const screenWidth = Dimensions.get('window').width;
+      const contentPadding = 16; // paddingHorizontal in contentContainerStyle
+      const gap = 8; // gap between items
+      
+      // Estimate item width more accurately
+      // minWidth is 80, but with padding (16*2=32) and text, average is ~100-110px
+      // Use a more conservative estimate that accounts for variable text widths
+      const avgItemWidth = 100; // Average width accounting for text variation
+      
+      // Calculate cumulative width up to "Today" item
+      let cumulativeWidth = contentPadding;
+      for (let i = 0; i < todayIndex; i++) {
+        cumulativeWidth += avgItemWidth + gap;
+      }
+      
+      // Add half of "Today" item width to get its center
+      const todayItemCenter = cumulativeWidth + (avgItemWidth / 2);
+      
+      // Scroll to center: item center - screen center
+      const scrollPosition = Math.max(0, todayItemCenter - (screenWidth / 2));
+      
+      setTimeout(() => {
+        dateScrollViewRef.current?.scrollTo({
+          x: scrollPosition,
+          animated: true,
+        });
+      }, 400);
+    }
+  }, [dateOptions]);
 
   const handleMatchPress = (fixtureId: number) => {
     router.push(`/match/${fixtureId}`);
@@ -99,155 +105,107 @@ export default function FeedScreen() {
     router.push(`/match/${fixtureId}`);
   };
 
+  const handleShoutPress = (fixtureId: number) => {
+    router.push(`/match/${fixtureId}`);
+  };
+
+  // Filter and sort fixtures by selected date and kickoff time
+  const filteredAndSortedFixtures = useMemo(() => {
+    const selectedDateStr = selectedDate.toISOString().split('T')[0];
+    
+    // Filter fixtures for selected date
+    const filtered = mockFixtures.filter((fixture) => {
+      const fixtureDate = new Date(fixture.timestamp * 1000).toISOString().split('T')[0];
+      return fixtureDate === selectedDateStr;
+    });
+    
+    // Sort by timestamp ascending (earliest kickoff first)
+    return filtered.sort((a, b) => a.timestamp - b.timestamp);
+  }, [selectedDate]);
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Pill switcher */}
-      <View style={[styles.switcher, { backgroundColor: theme.colors.surface }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top * 0.4 }]}>
+      {/* Header with Logo and Calendar */}
+      <View style={styles.header}>
+        <Text variant="h1" style={styles.logo}>
+          12thMan
+        </Text>
         <TouchableOpacity
-          onPress={() => setFeedType('forYou')}
-          style={[
-            styles.pill,
-            feedType === 'forYou' && {
-              backgroundColor: theme.colors.accent,
-            },
-          ]}
+          onPress={() => setShowDatePicker(!showDatePicker)}
+          style={styles.calendarButton}
         >
-          <Text
-            variant="body"
-            style={[
-              styles.pillText,
-              {
-                color: feedType === 'forYou' ? '#FFFFFF' : theme.colors.textSecondary,
-                fontWeight: feedType === 'forYou' ? '600' : '400',
-              },
-            ]}
-          >
-            For You
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setFeedType('following')}
-          style={[
-            styles.pill,
-            feedType === 'following' && {
-              backgroundColor: theme.colors.accent,
-            },
-          ]}
-        >
-          <Text
-            variant="body"
-            style={[
-              styles.pillText,
-              {
-                color: feedType === 'following' ? '#FFFFFF' : theme.colors.textSecondary,
-                fontWeight: feedType === 'following' ? '600' : '400',
-              },
-            ]}
-          >
-            Following
-          </Text>
+          <Calendar size={28} color={theme.colors.text} />
         </TouchableOpacity>
       </View>
 
-      {/* Filter chips */}
+      {/* Date Navigation Bar */}
       <ScrollView
+        ref={dateScrollViewRef}
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.filterContainer}
-        contentContainerStyle={styles.filterContent}
+        style={styles.dateNavContainer}
+        contentContainerStyle={styles.dateNavContent}
       >
-        {(['all', 'posted', 'queued', 'failed'] as TakeFilter[]).map((filter) => (
-          <TouchableOpacity
-            key={filter}
-            onPress={() => setTakeFilter(filter)}
-            style={[
-              styles.filterChip,
-              {
-                backgroundColor:
-                  takeFilter === filter ? theme.colors.accent : theme.colors.surface,
-                borderColor: takeFilter === filter ? theme.colors.accent : theme.colors.border,
-              },
-            ]}
-          >
-            <Text
-              variant="caption"
-              style={{
-                color: takeFilter === filter ? '#FFFFFF' : theme.colors.text,
-                fontWeight: takeFilter === filter ? '600' : '400',
-                textTransform: 'capitalize',
-              }}
+        {dateOptions.map((date) => {
+          const isSelected = date.toISOString().split('T')[0] === selectedDate.toISOString().split('T')[0];
+          return (
+            <TouchableOpacity
+              key={date.toISOString()}
+              onPress={() => setSelectedDate(date)}
+              style={[
+                styles.dateOption,
+                {
+                  backgroundColor: isSelected ? theme.colors.accent : theme.colors.surface,
+                  borderColor: isSelected ? theme.colors.accent : theme.colors.border,
+                },
+              ]}
             >
-              {filter}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Text
+                variant="body"
+                style={[
+                  styles.dateOptionText,
+                  {
+                    color: isSelected ? '#FFFFFF' : theme.colors.text,
+                    fontWeight: isSelected ? '600' : '400',
+                  },
+                ]}
+              >
+                {formatDateDisplay(date)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
+      {/* Games List */}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
-        {/* Match cards */}
-        {mockFixtures.map((fixture) => (
-          <MatchCard
-            key={fixture.id}
-            fixture={fixture}
-            onPress={() => handleMatchPress(fixture.id)}
-            onRatePress={
-              fixture.status === 'FT'
-                ? () => handleRatePress(fixture.id)
-                : undefined
-            }
-          />
-        ))}
-
-        {/* Takes */}
-        {processedTakes.length > 0 ? (
-          processedTakes.map((take) => (
-            <TakeCard
-              key={take.id}
-              take={take}
-              onEdit={async (takeToEdit) => {
-                // Convert take to draft
-                const { draftRepository } = await import('@/src/lib/domain/draftRepository');
-                await draftRepository.saveDraft({
-                  fixtureId: takeToEdit.fixtureId,
-                  matchRating: takeToEdit.matchRating,
-                  motmPlayerId: takeToEdit.motmPlayerId ?? null,
-                  text: takeToEdit.text,
-                });
-                // Store take ID for editing
-                await import('@/src/lib/storage/storage').then(({ storage, STORAGE_KEYS }) =>
-                  storage.set('@12thman:editing_take_id', takeToEdit.id)
-                );
-                router.push('/(tabs)/post');
-              }}
-              onDelete={async (takeToDelete) => {
-                await takeRepository.delete(takeToDelete.id);
-                await loadTakes();
-              }}
-              onRetry={async (takeToRetry) => {
-                await takeRepository.updateStatus(takeToRetry.id, 'queued');
-                await takeRepository.update(takeToRetry.id, {
-                  errorMessage: undefined,
-                  lastAttemptAt: undefined,
-                });
-                await loadTakes();
-              }}
+        {filteredAndSortedFixtures.length > 0 ? (
+          filteredAndSortedFixtures.map((fixture) => (
+            <MatchCard
+              key={fixture.id}
+              fixture={fixture}
+              onPress={() => handleMatchPress(fixture.id)}
+              onRatePress={
+                fixture.status === MatchStatus.FINISHED
+                  ? () => handleRatePress(fixture.id)
+                  : undefined
+              }
+              onShoutPress={
+                fixture.status === MatchStatus.LIVE || fixture.status === MatchStatus.UPCOMING
+                  ? () => handleShoutPress(fixture.id)
+                  : undefined
+              }
             />
           ))
         ) : (
           <View style={styles.emptyState}>
             <Text variant="body" style={{ color: theme.colors.textSecondary, textAlign: 'center' }}>
-              {takeFilter === 'all'
-                ? 'No takes yet'
-                : takeFilter === 'queued'
-                  ? 'No queued takes'
-                  : takeFilter === 'failed'
-                    ? 'No failed takes'
-                    : 'No posted takes'}
+              No matches scheduled for {formatDateDisplay(selectedDate)}
             </Text>
           </View>
         )}
@@ -260,40 +218,44 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  switcher: {
+  header: {
     flexDirection: 'row',
-    padding: 4,
-    margin: 16,
-    borderRadius: 12,
-    gap: 4,
-  },
-  pill: {
-    flex: 1,
-    paddingVertical: 8,
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingTop: 18,
+    paddingBottom: 8,
+  },
+  logo: {
+    fontSize: 30,
+    fontWeight: '700',
+  },
+  calendarButton: {
+    padding: 10,
+  },
+  dateNavContainer: {
+    maxHeight: 50,
+    marginTop: -4,
+    marginBottom: 8,
+  },
+  dateNavContent: {
+    paddingHorizontal: 16,
+    gap: 8,
     alignItems: 'center',
   },
-  pillText: {
+  dateOption: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  dateOptionText: {
     fontSize: 14,
   },
   scrollView: {
     flex: 1,
-  },
-  filterContainer: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-  },
-  filterContent: {
-    paddingVertical: 8,
-    gap: 8,
-  },
-  filterChip: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginRight: 8,
   },
   scrollContent: {
     padding: 16,
@@ -301,6 +263,7 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     paddingVertical: 48,
+    paddingHorizontal: 16,
     alignItems: 'center',
   },
 });

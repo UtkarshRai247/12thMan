@@ -8,7 +8,7 @@ import { Take } from '../lib/domain/types';
 
 interface TakeCardProps {
   take: Take;
-  onReaction?: (type: 'cheer' | 'boo' | 'comment') => void;
+  onReaction?: (type: 'cheer' | 'boo' | 'shout') => void;
   onEdit?: (take: Take) => void;
   onDelete?: (take: Take) => void;
   onRetry?: (take: Take) => void;
@@ -175,10 +175,10 @@ export function TakeCard({ take, onReaction, onEdit, onDelete, onRetry }: TakeCa
       <ReactionBar
         cheerCount={take.reactions.cheer}
         booCount={take.reactions.boo}
-        commentCount={take.reactions.comment}
+        shoutCount={take.reactions.shout}
         onCheer={() => onReaction?.('cheer')}
         onBoo={() => onReaction?.('boo')}
-        onComment={() => onReaction?.('comment')}
+        onShout={() => onReaction?.('shout')}
       />
     </View>
   );

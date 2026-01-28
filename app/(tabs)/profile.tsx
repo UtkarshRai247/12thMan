@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import { RefreshCw } from 'lucide-react-native';
 import { useTheme } from '@/src/theme/ThemeProvider';
 import { Text } from '@/src/components/Text';
@@ -8,12 +8,29 @@ import { Toast } from '@/src/components/Toast';
 import { mockFixtures } from '@/src/data/mock/fixtures';
 import { syncService } from '@/src/lib/sync/syncService';
 import { takeRepository } from '@/src/lib/domain/takeRepository';
+import { userRepository } from '@/src/lib/domain/userRepository';
+import { LocalUser } from '@/src/lib/domain/types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const [user, setUser] = useState<LocalUser | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
+
+  // Load user data when screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadUser = async () => {
+        const currentUser = await userRepository.getCurrentUser();
+        setUser(currentUser);
+      };
+      loadUser();
+    }, [])
+  );
 
   // Mock user ratings (finished matches only)
   const userRatings = mockFixtures.filter((f) => f.status === 'FT').slice(0, 3);
@@ -61,7 +78,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}>
       {toast && (
         <Toast
           message={toast.message}
@@ -92,16 +109,74 @@ export default function ProfileScreen() {
               },
             ]}
           >
-            <Text variant="h1" style={styles.avatarText}>
-              UR
+            <Text 
+              variant="h1" 
+              style={[
+                styles.avatarText,
+                { color: theme.colors.text }
+              ]}
+            >
+              {user
+                ? user.userName
+                    .split(' ')
+                    .map((n) => n[0])
+                    .join('')
+                    .toUpperCase()
+                    .slice(0, 2) || user.userName.slice(0, 2).toUpperCase()
+                : '??'}
             </Text>
           </View>
-          <Text variant="h2" style={{ color: '#FFFFFF', marginTop: 12 }}>
-            @FanUsername
+          <Text 
+            variant="h2" 
+            style={{ 
+              color: theme.colorScheme === 'dark' ? '#111827' : '#FFFFFF', 
+              marginTop: 12 
+            }}
+          >
+            {user ? user.userName : 'Loading...'}
           </Text>
-          <Text variant="body" style={{ color: 'rgba(255,255,255,0.8)', marginTop: 4 }}>
-            Arsenal • London
+          <Text 
+            variant="body" 
+            style={{ 
+              color: theme.colorScheme === 'dark' 
+                ? '#374151' 
+                : 'rgba(255,255,255,0.8)', 
+              marginTop: 4 
+            }}
+          >
+            {user ? user.userClub : 'Loading...'}
           </Text>
+        </View>
+      </View>
+
+      {/* Appearance section */}
+      <View
+        style={[
+          styles.section,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.border,
+          },
+        ]}
+      >
+        <Text variant="title" style={styles.sectionTitle}>
+          Appearance
+        </Text>
+        <View style={styles.settingRow}>
+          <View style={styles.settingContent}>
+            <Text variant="body" style={{ color: theme.colors.text }}>
+              Dark Mode
+            </Text>
+            <Text variant="caption" style={{ color: theme.colors.textSecondary, marginTop: 2 }}>
+              Toggle between light and dark theme
+            </Text>
+          </View>
+          <Switch
+            value={theme.colorScheme === 'dark'}
+            onValueChange={() => theme.toggleTheme()}
+            trackColor={{ false: theme.colors.border, true: theme.colors.accent }}
+            thumbColor={theme.colorScheme === 'dark' ? '#FFFFFF' : '#FFFFFF'}
+          />
         </View>
       </View>
 
@@ -265,5 +340,14 @@ const styles = StyleSheet.create({
   },
   spinning: {
     transform: [{ rotate: '360deg' }],
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  settingContent: {
+    flex: 1,
+    marginRight: 16,
   },
 });

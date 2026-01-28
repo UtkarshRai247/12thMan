@@ -10,10 +10,12 @@ import { useTheme } from '@/src/theme/ThemeProvider';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function PostScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [user, setUser] = useState<LocalUser | null>(null);
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
   const [matchRating, setMatchRating] = useState<number | null>(null);
@@ -233,7 +235,7 @@ export default function PostScreen() {
 
   return (
     <ScrollView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top }]}
       contentContainerStyle={styles.content}
     >
       <View style={styles.header}>

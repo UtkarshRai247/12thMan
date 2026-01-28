@@ -43,7 +43,7 @@ export interface Take {
   reactions: {
     cheer: number;
     boo: number;
-    comment: number;
+    shout: number;
   };
   
   // Status and sync info

@@ -1,16 +1,17 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Fixture, MatchStatus } from '../lib/apiFootball/types';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
-import { Fixture, MatchStatus } from '../lib/apiFootball/types';
 
 interface MatchCardProps {
   fixture: Fixture;
   onPress?: () => void;
   onRatePress?: () => void;
+  onShoutPress?: () => void;
 }
 
-export function MatchCard({ fixture, onPress, onRatePress }: MatchCardProps) {
+export function MatchCard({ fixture, onPress, onRatePress, onShoutPress }: MatchCardProps) {
   const theme = useTheme();
 
   const getStatusColor = () => {
@@ -42,6 +43,15 @@ export function MatchCard({ fixture, onPress, onRatePress }: MatchCardProps) {
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp * 1000);
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  };
+
+  // Calculate font size based on team name length
+  const getTeamNameFontSize = (teamName: string) => {
+    const length = teamName.length;
+    if (length <= 8) return 18; // Normal size for short names
+    if (length <= 12) return 16; // Slightly smaller for medium names
+    if (length <= 16) return 14; // Smaller for long names
+    return 12; // Smallest for very long names like "Manchester United"
   };
 
   return (
@@ -85,7 +95,12 @@ export function MatchCard({ fixture, onPress, onRatePress }: MatchCardProps) {
 
       <View style={styles.matchInfo}>
         <View style={styles.teamSection}>
-          <Text variant="title" style={styles.teamName}>
+          <Text 
+            variant="title" 
+            style={[styles.teamName, { fontSize: getTeamNameFontSize(fixture.homeTeam.name) }]}
+            numberOfLines={2}
+            adjustsFontSizeToFit={false}
+          >
             {fixture.homeTeam.name}
           </Text>
           <Text variant="body" style={{ color: theme.colors.textSecondary }}>
@@ -114,7 +129,12 @@ export function MatchCard({ fixture, onPress, onRatePress }: MatchCardProps) {
         </View>
 
         <View style={styles.teamSection}>
-          <Text variant="title" style={styles.teamName}>
+          <Text 
+            variant="title" 
+            style={[styles.teamName, { fontSize: getTeamNameFontSize(fixture.awayTeam.name) }]}
+            numberOfLines={2}
+            adjustsFontSizeToFit={false}
+          >
             {fixture.awayTeam.name}
           </Text>
           <Text variant="body" style={{ color: theme.colors.textSecondary }}>
@@ -127,7 +147,7 @@ export function MatchCard({ fixture, onPress, onRatePress }: MatchCardProps) {
         <TouchableOpacity
           onPress={onRatePress}
           style={[
-            styles.rateButton,
+            styles.actionButton,
             {
               backgroundColor: theme.colors.accent,
             },
@@ -135,6 +155,22 @@ export function MatchCard({ fixture, onPress, onRatePress }: MatchCardProps) {
         >
           <Text variant="body" style={{ color: '#FFFFFF', fontWeight: '600' }}>
             Rate Now
+          </Text>
+        </TouchableOpacity>
+      )}
+      
+      {(fixture.status === MatchStatus.LIVE || fixture.status === MatchStatus.UPCOMING) && onShoutPress && (
+        <TouchableOpacity
+          onPress={onShoutPress}
+          style={[
+            styles.actionButton,
+            {
+              backgroundColor: theme.colors.accent,
+            },
+          ]}
+        >
+          <Text variant="body" style={{ color: '#FFFFFF', fontWeight: '600' }}>
+            Shout
           </Text>
         </TouchableOpacity>
       )}
@@ -169,26 +205,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+    gap: 8,
   },
   teamSection: {
     flex: 1,
     alignItems: 'center',
+    minWidth: 0, // Allows flex to shrink properly
+    paddingHorizontal: 4,
+    maxWidth: '38%', // Slightly more width for better wrapping
   },
   teamName: {
     marginBottom: 4,
     textAlign: 'center',
+    width: '100%',
+    lineHeight: 20, // Consistent line height for better wrapping
   },
   scoreSection: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
+    flexShrink: 0, // Prevent score section from shrinking
   },
   score: {
     minWidth: 30,
     textAlign: 'center',
   },
-  rateButton: {
+  actionButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,

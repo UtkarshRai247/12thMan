@@ -27,15 +27,24 @@ export default function OnboardingScreen() {
 
     setIsSaving(true);
     try {
-      await userRepository.saveUser({
+      const savedUser = await userRepository.saveUser({
         userName: userName.trim(),
         userClub: selectedClub,
       });
+      
+      // Verify the user was actually saved
+      const verifiedUser = await userRepository.getCurrentUser();
+      if (!verifiedUser || verifiedUser.userName !== userName.trim()) {
+        throw new Error('Failed to verify user was saved');
+      }
+      
+      // Small delay to ensure storage is fully persisted
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      
       router.replace('/(tabs)');
     } catch (error) {
       Alert.alert('Error', 'Failed to save profile. Please try again.');
       console.error('Error saving user:', error);
-    } finally {
       setIsSaving(false);
     }
   };
@@ -97,9 +106,9 @@ export default function OnboardingScreen() {
           Your Club
         </Text>
         <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
           style={styles.clubSelector}
+          contentContainerStyle={styles.clubSelectorContent}
         >
           {CLUBS.map((club) => (
             <TouchableOpacity
@@ -185,13 +194,16 @@ const styles = StyleSheet.create({
   },
   clubSelector: {
     marginTop: 8,
+    maxHeight: 200,
+  },
+  clubSelectorContent: {
+    gap: 8,
   },
   clubOption: {
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
     borderWidth: 1,
-    marginRight: 8,
   },
   saveButton: {
     paddingVertical: 16,
