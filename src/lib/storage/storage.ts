@@ -13,6 +13,7 @@ export const STORAGE_KEYS = {
   SYNC_FAILURE_SIMULATION: '@12thman:sync_failure_simulation',
   USER: '@12thman:user',
   SYNC_LOG: '@12thman:sync_log',
+  FOLLOWING: '@12thman:following',
 } as const;
 
 class Storage {

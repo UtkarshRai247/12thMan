@@ -28,6 +28,9 @@ export interface Take {
   // Provider ID (server-side ID, only set after successful sync)
   providerId?: string;
   
+  // Thread reply: if set, this take is a reply to another take
+  parentTakeId?: string;
+  
   // User info (placeholder for now)
   userId: string;
   userName: string;

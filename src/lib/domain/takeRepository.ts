@@ -41,16 +41,19 @@ class TakeRepository {
   }
 
   /**
-   * Create a new take (queued status)
+   * Create a new take (queued status). Optional parentTakeId for thread replies.
    */
-  async create(takeData: Omit<Take, 'id' | 'clientId' | 'status' | 'retryCount' | 'createdAt'>): Promise<Take> {
+  async create(
+    takeData: Omit<Take, 'id' | 'clientId' | 'status' | 'retryCount' | 'createdAt'> & { parentTakeId?: string }
+  ): Promise<Take> {
     const id = uuidv4();
     const clientId = uuidv4(); // Stable client ID for idempotency
-    
+
     const take: Take = {
       ...takeData,
       id,
       clientId,
+      parentTakeId: takeData.parentTakeId,
       status: 'queued',
       retryCount: 0,
       createdAt: new Date().toISOString(),
@@ -58,6 +61,24 @@ class TakeRepository {
 
     await this.save(take);
     return take;
+  }
+
+  /**
+   * Get all replies to a take (thread replies)
+   */
+  async getReplies(parentTakeId: string): Promise<Take[]> {
+    const allTakes = await this.getAll();
+    const replies = allTakes.filter((t) => t.parentTakeId === parentTakeId);
+    replies.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return replies;
+  }
+
+  /**
+   * Get only top-level takes (no parent), for feed display
+   */
+  async getTopLevel(): Promise<Take[]> {
+    const allTakes = await this.getAll();
+    return allTakes.filter((t) => !t.parentTakeId);
   }
 
   /**
