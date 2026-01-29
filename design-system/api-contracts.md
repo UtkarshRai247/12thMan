@@ -127,6 +127,47 @@ cache.set('fixtures:2024-01-26', fixtures, 300);
 const cached = cache.get<Fixture[]>('fixtures:2024-01-26');
 ```
 
+## Backend Fixture API (server)
+
+The server exposes provider-agnostic fixture endpoints. Internal IDs are UUIDs; never use provider IDs as primary keys.
+
+### GET /fixtures response
+
+```typescript
+interface FixturesListResponse {
+  items: Array<{
+    id: string;                    // UUID (canonical Fixture.id)
+    kickoffAt: string;            // ISO datetime
+    status: 'SCHEDULED' | 'LIVE' | 'FINISHED' | 'POSTPONED' | 'CANCELLED';
+    teams: { home: string; away: string };
+    score: { home: number | null; away: number | null };
+    competition: string | null;
+    enrichmentSummary?: NormalizedEnrichmentSummary;
+  }>;
+}
+```
+
+### GET /fixtures/:id response
+
+Same shape as list item, plus optional `providerMaps: { provider, providerFixtureId }[]` and, when `includeRaw=true`, `enrichmentsRaw: { provider, kind, payload, fetchedAt }[]`.
+
+### Enrichment summary contract
+
+Enrichment payloads (FotMob, SofaScore) are stored in `FixtureEnrichment`; only a **normalized summary** is exposed by default (not raw provider JSON).
+
+```typescript
+interface NormalizedEnrichmentSummary {
+  xg?: { home?: number; away?: number };
+  shots?: { home?: number; away?: number };
+  possession?: { home?: number; away?: number };
+  momentumSummary?: string | null;
+  hasShotmap?: boolean;
+  lastUpdatedAt?: string;  // ISO
+}
+```
+
+Raw payloads are available only via `GET /fixtures/:id?includeRaw=true` for admin/debug.
+
 ## Future Integration
 
 ### Supabase

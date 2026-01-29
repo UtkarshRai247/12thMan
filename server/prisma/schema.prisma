@@ -10,6 +10,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ---------------------------------------------------------------------------
+// Auth & Takes (existing)
+// ---------------------------------------------------------------------------
+
 model User {
   id        String   @id @default(uuid())
   username  String   @unique
@@ -25,7 +29,9 @@ model Take {
   userId           String
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   clientId         String            // idempotency key from client
-  fixtureId        String
+  fixtureId        String            // legacy: provider fixture id (e.g. API-Football)
+  fixtureRefId     String?           // optional FK to canonical Fixture.id
+  fixtureRef       Fixture?          @relation(fields: [fixtureRefId], references: [id], onDelete: SetNull)
   matchRating      Int
   motmPlayerId     String?
   text             String
@@ -36,6 +42,7 @@ model Take {
   @@unique([userId, clientId])
   @@index([fixtureId, createdAt, id])
   @@index([userId, createdAt, id])
+  @@index([fixtureRefId])
   @@map("takes")
 }
 
@@ -43,4 +50,72 @@ enum ModerationStatus {
   POSTED
   HIDDEN
   REMOVED
+}
+
+// ---------------------------------------------------------------------------
+// Canonical Fixtures (provider-agnostic)
+// ---------------------------------------------------------------------------
+
+model Fixture {
+  id             String    @id @default(uuid())
+  status         FixtureStatus
+  kickoffAt      DateTime
+  competition    String?
+  season         String?
+  homeTeamName   String
+  awayTeamName   String
+  homeScore      Int?
+  awayScore      Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  providerMaps  ProviderFixtureMap[]
+  enrichments    FixtureEnrichment[]
+  takes         Take[]
+
+  @@index([kickoffAt])
+  @@index([status, kickoffAt])
+  @@map("fixtures")
+}
+
+enum FixtureStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  POSTPONED
+  CANCELLED
+}
+
+model ProviderFixtureMap {
+  id               String   @id @default(uuid())
+  fixtureId        String
+  fixture          Fixture  @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+  provider         Provider
+  providerFixtureId String
+  createdAt        DateTime @default(now())
+
+  @@unique([provider, providerFixtureId])
+  @@unique([fixtureId, provider])
+  @@index([fixtureId, provider])
+  @@map("provider_fixture_maps")
+}
+
+enum Provider {
+  API_FOOTBALL
+  FOTMOB
+  SOFASCORE
+}
+
+model FixtureEnrichment {
+  id         String   @id @default(uuid())
+  fixtureId String
+  fixture   Fixture  @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+  provider  Provider // FOTMOB | SOFASCORE
+  kind      String   // MATCH_DETAILS | LINEUPS | STATS | SHOTMAP | MOMENTUM
+  payload   Json
+  fetchedAt DateTime @default(now())
+  ttlSeconds Int
+
+  @@unique([fixtureId, provider, kind])
+  @@index([fixtureId, provider, kind])
+  @@map("fixture_enrichments")
 }

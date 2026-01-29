@@ -9,6 +9,7 @@ Node.js + TypeScript backend for the 12thMan mobile app, built with Fastify, Pri
 - **Cursor Pagination**: Efficient feed pagination
 - **Rate Limiting**: Abuse protection with configurable limits
 - **Type Safety**: Full TypeScript with Zod validation
+- **Provider-agnostic fixtures**: Canonical Fixture model; API-Football ingestion; optional FotMob/worker enrichment (kill-switchable)
 
 ## Prerequisites
 
@@ -46,6 +47,40 @@ Node.js + TypeScript backend for the 12thMan mobile app, built with Fastify, Pri
    ```
 
 The server will start on `http://localhost:4000`
+
+### Optional: Run the enrichment worker (Python)
+
+For best-effort FotMob/SofaScore enrichment (when `ENABLE_WORKER=true`):
+
+```bash
+cd worker
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 6001
+```
+
+See `worker/README.md` for details.
+
+### Ingest fixtures (admin)
+
+After server and DB are running, set `API_FOOTBALL_KEY` and `ADMIN_TOKEN` in `.env`, then:
+
+```bash
+# Ingest fixtures for a date (canonical source: API-Football)
+curl -X POST "http://localhost:4000/admin/ingest/fixtures?date=2026-01-27" \
+  -H "x-admin-token: change-me"
+
+# Ingest live fixtures (update status + score)
+curl -X POST http://localhost:4000/admin/ingest/live \
+  -H "x-admin-token: change-me"
+
+# Enrich a fixture (FotMob/worker when enabled)
+curl -X POST http://localhost:4000/admin/enrich/FIXTURE_UUID \
+  -H "x-admin-token: change-me"
+```
+
+**Warnings:** Unofficial sources (FotMob, SofaScore via worker) are best-effort and guarded by flags. When `ENABLE_FOTMOB=false` and `ENABLE_WORKER=false`, core endpoints still work. Never use provider IDs as primary keys; internal IDs are UUIDs.
 
 ## API Endpoints
 
@@ -190,6 +225,26 @@ Get paginated feed of takes.
 }
 ```
 
+### Fixtures (public, DB-first)
+
+#### `GET /fixtures?date=YYYY-MM-DD&limit=100`
+Returns fixtures from DB for that date. Optional `date`; default limit 50, max 100.
+
+**Response:** `{ items: [{ id, kickoffAt, status, teams, score, competition, enrichmentSummary? }] }`
+
+#### `GET /fixtures/live`
+Returns fixtures where `status=LIVE`.
+
+#### `GET /fixtures/:id?includeRaw=false`
+Returns one fixture. Include raw enrichment payloads when `includeRaw=true`.
+
+### Admin (header `x-admin-token` required)
+
+- `POST /admin/fixtures/:id/map` — Body: `{ provider: "FOTMOB"|"SOFASCORE", providerFixtureId }`. Upsert provider mapping.
+- `POST /admin/ingest/fixtures?date=YYYY-MM-DD` — Run ingest from API-Football for that date.
+- `POST /admin/ingest/live` — Update live fixture status/scores.
+- `POST /admin/enrich/:fixtureId` — Run enrichment (FotMob/worker when enabled).
+
 ## Testing with curl
 
 ### Register a user:
@@ -225,6 +280,20 @@ curl -X POST http://localhost:4000/takes/sync \
 curl http://localhost:4000/feed?limit=10
 ```
 
+### Fixtures (after ingest):
+```bash
+curl "http://localhost:4000/fixtures?date=2026-01-27&limit=20"
+curl http://localhost:4000/fixtures/live
+curl http://localhost:4000/fixtures/FIXTURE_UUID
+```
+
+### Admin ingest (set ADMIN_TOKEN in .env):
+```bash
+curl -X POST "http://localhost:4000/admin/ingest/fixtures?date=2026-01-27" -H "x-admin-token: change-me"
+curl -X POST http://localhost:4000/admin/ingest/live -H "x-admin-token: change-me"
+curl -X POST http://localhost:4000/admin/enrich/FIXTURE_UUID -H "x-admin-token: change-me"
+```
+
 ## Scripts
 
 - `npm run dev` - Start development server with hot reload
@@ -239,7 +308,10 @@ curl http://localhost:4000/feed?limit=10
 The database schema is managed with Prisma. Key models:
 
 - **User**: User accounts with username and club
-- **Take**: User takes on matches with idempotent `clientId`
+- **Take**: User takes on matches with idempotent `clientId`; optional `fixtureRefId` (FK to Fixture)
+- **Fixture**: Canonical match record (UUID id, status, kickoffAt, teams, score, competition, season)
+- **ProviderFixtureMap**: Maps provider (API_FOOTBALL, FOTMOB, SOFASCORE) + providerFixtureId to Fixture.id
+- **FixtureEnrichment**: Enrichment payloads (provider, kind, payload JSON, ttlSeconds)
 
 See `prisma/schema.prisma` for full schema.
 
@@ -249,6 +321,13 @@ See `prisma/schema.prisma` for full schema.
 - `JWT_SECRET` - Secret for JWT token signing
 - `PORT` - Server port (default: 4000)
 - `NODE_ENV` - Environment (development/production/test)
+- `API_FOOTBALL_KEY` - Optional; required for admin ingest (fixtures/live)
+- `ADMIN_TOKEN` - Optional; required for admin routes (ingest, map, enrich)
+- `ENABLE_FOTMOB` - Optional; set to `true` to enable FotMob enrichment (rate limit, cache, circuit breaker)
+- `FOTMOB_REQUESTS_PER_MINUTE`, `FOTMOB_TTL_LIVE_SECONDS`, `FOTMOB_TTL_FINISHED_SECONDS` - FotMob tuning
+- `ENABLE_WORKER` - Optional; set to `true` to call Python worker for SofaScore/FotMob
+- `WORKER_BASE_URL` - Worker base URL (default: http://localhost:6001)
+- `WORKER_REQUESTS_PER_MINUTE` - Worker rate limit (default: 30)
 
 ## Error Format
 

@@ -132,6 +132,7 @@ export async function takesRoutes(fastify: FastifyInstance) {
       username: take.user.username,
       club: take.user.club,
       fixtureId: take.fixtureId,
+      fixtureRefId: take.fixtureRefId ?? undefined,
       matchRating: take.matchRating,
       motmPlayerId: take.motmPlayerId,
       text: take.text,
@@ -140,3 +141,5 @@ export async function takesRoutes(fastify: FastifyInstance) {
     };
   });
 }
+
+

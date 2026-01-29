@@ -6,6 +6,8 @@ import { rateLimitPlugin } from './plugins/rateLimit';
 import { authRoutes } from './routes/auth';
 import { takesRoutes } from './routes/takes';
 import { feedRoutes } from './routes/feed';
+import { fixtureRoutes } from './routes/fixtures';
+import { adminRoutes } from './routes/admin';
 import { handleError } from './lib/errors';
 
 async function buildServer() {
@@ -27,6 +29,8 @@ async function buildServer() {
   await fastify.register(authRoutes, { prefix: '/auth' });
   await fastify.register(takesRoutes, { prefix: '/takes' });
   await fastify.register(feedRoutes);
+  await fastify.register(fixtureRoutes);
+  await fastify.register(adminRoutes, { prefix: '/admin' });
 
   // Health check
   fastify.get('/health', async () => {
@@ -49,6 +53,17 @@ async function buildServer() {
           getById: 'GET /takes/:id',
         },
         feed: 'GET /feed',
+        fixtures: {
+          list: 'GET /fixtures?date=YYYY-MM-DD&limit=100',
+          live: 'GET /fixtures/live',
+          byId: 'GET /fixtures/:id',
+        },
+        admin: {
+          map: 'POST /admin/fixtures/:id/map',
+          ingestFixtures: 'POST /admin/ingest/fixtures?date=YYYY-MM-DD',
+          ingestLive: 'POST /admin/ingest/live',
+          enrich: 'POST /admin/enrich/:fixtureId',
+        },
       },
     };
   });
